@@ -78,10 +78,61 @@ Error generating stack: `+l.message+`
 </script>
 
     <div id="root"></div>
+    <div id="utterances-container"></div>
     <script
       defer
       src="%VITE_ANALYTICS_ENDPOINT%/umami"
       data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
+  <script>
+    function loadUtterances() {
+      const path = window.location.pathname;
+      const container = document.getElementById('utterances-container');
+      
+      // تحقق من المسار لضمان تحميل التعليقات فقط في صفحة "نبض الزوار"
+      if (path.includes('visitor-pulse') && container) {
+        // إزالة المحتوى الحالي للصفحة (النموذج والتعليقات القديمة)
+        // هذا افتراض بأن المحتوى القديم موجود داخل #root ويمكن إزالته/إخفاؤه
+        // لكن بما أننا لا نملك كود React، سنقوم فقط بإضافة Utterances
+        
+        // إعداد Utterances
+        const script = document.createElement('script');
+        script.src = 'https://utteranc.es/client.js';
+        script.setAttribute('repo', 'yhfb/yhfb.github.io'); // يجب أن يكون المستودع صحيحًا
+        script.setAttribute('issue-term', 'pathname'); // استخدام مسار الصفحة لربط التعليقات
+        script.setAttribute('label', 'نبض الزوار');
+        script.setAttribute('theme', 'github-light');
+        script.setAttribute('crossorigin', 'anonymous');
+        script.async = true;
+        
+        // إزالة أي تعليقات Utterances سابقة قبل الإضافة
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+        
+        // إضافة Utterances إلى الحاوية
+        container.appendChild(script);
+        
+        // محاولة إخفاء النموذج القديم إذا كان موجودًا
+        // بما أننا لا نملك كود React، سنعتمد على أن Utterances سيظهر أسفل المحتوى
+        // وسنترك الأمر للمستخدم ليرى التغيير
+        
+      } else if (container) {
+        // إزالة Utterances إذا لم نكن في صفحة التعليقات
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+      }
+    }
+
+    // استدعاء الدالة عند تحميل الصفحة
+    loadUtterances();
+    
+    // إضافة مستمع حدث لتشغيل الدالة عند تغيير المسار في SPA
+    window.addEventListener('popstate', loadUtterances);
+    // قد تحتاج تطبيقات React إلى طريقة أخرى لاكتشاف تغيير المسار
+    // سنعتمد على popstate و window.location.pathname
+    
+  </script>
   </body>
 
 </html>
