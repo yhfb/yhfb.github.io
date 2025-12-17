@@ -78,57 +78,155 @@ Error generating stack: `+l.message+`
 </script>
 
     <div id="root"></div>
-    <div id="utterances-container"></div>
+    <div id="comments-container"></div>
     <script
       defer
       src="%VITE_ANALYTICS_ENDPOINT%/umami"
       data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
   <script>
-    function loadUtterances() {
+    // نظام التعليقات المحلي - يحفظ التعليقات في localStorage
+    class CommentsSystem {
+      constructor() {
+        this.storageKey = 'aqaba_comments';
+        this.comments = this.loadComments();
+      }
+
+      loadComments() {
+        try {
+          const stored = localStorage.getItem(this.storageKey);
+          return stored ? JSON.parse(stored) : [];
+        } catch (e) {
+          console.error('Error loading comments:', e);
+          return [];
+        }
+      }
+
+      saveComments() {
+        try {
+          localStorage.setItem(this.storageKey, JSON.stringify(this.comments));
+        } catch (e) {
+          console.error('Error saving comments:', e);
+        }
+      }
+
+      addComment(name, text) {
+        if (!name.trim() || !text.trim()) return false;
+        
+        const comment = {
+          id: Date.now(),
+          name: name.trim(),
+          text: text.trim(),
+          date: new Date().toLocaleDateString('ar-EG')
+        };
+        
+        this.comments.unshift(comment);
+        this.saveComments();
+        return true;
+      }
+
+      getComments() {
+        return this.comments;
+      }
+    }
+
+    const commentsSystem = new CommentsSystem();
+
+    function renderComments() {
       const path = window.location.pathname;
-      const container = document.getElementById('utterances-container');
+      const container = document.getElementById('comments-container');
       
-      // تحقق من المسار لضمان تحميل التعليقات فقط في صفحة "نبض الزوار"
-      if (path.includes('visitor-pulse') && container) {
-        // إزالة المحتوى الحالي للصفحة (النموذج والتعليقات القديمة)
-        // هذا افتراض بأن المحتوى القديم موجود داخل #root ويمكن إزالته/إخفاؤه
-        // لكن بما أننا لا نملك كود React، سنقوم فقط بإضافة Utterances
-        
-        // إعداد Utterances
-        const script = document.createElement('script');
-        script.src = 'https://utteranc.es/client.js';
-        script.setAttribute('repo', 'yhfb/yhfb.github.io'); // يجب أن يكون المستودع صحيحًا
-        script.setAttribute('issue-term', 'pathname'); // استخدام مسار الصفحة لربط التعليقات
-        script.setAttribute('label', 'نبض الزوار');
-        script.setAttribute('theme', 'github-light');
-        script.setAttribute('crossorigin', 'anonymous');
-        script.async = true;
-        
-        // إزالة أي تعليقات Utterances سابقة قبل الإضافة
-        while (container.firstChild) {
-          container.removeChild(container.firstChild);
-        }
-        
-        // إضافة Utterances إلى الحاوية
-        container.appendChild(script);
-        
-        // محاولة إخفاء النموذج القديم إذا كان موجودًا
-        // بما أننا لا نملك كود React، سنعتمد على أن Utterances سيظهر أسفل المحتوى
-        // وسنترك الأمر للمستخدم ليرى التغيير
-        
-      } else if (container) {
-        // إزالة Utterances إذا لم نكن في صفحة التعليقات
-        while (container.firstChild) {
-          container.removeChild(container.firstChild);
-        }
+      if (!path.includes('visitor-pulse') || !container) return;
+
+      const comments = commentsSystem.getComments();
+      let html = '<div style="margin-top: 30px; padding: 20px; background: #f9f9f9; border-radius: 8px;">';
+      html += '<h3 style="color: #333; margin-bottom: 20px;">التعليقات (' + comments.length + ')</h3>';
+      
+      if (comments.length === 0) {
+        html += '<p style="color: #999;">لا توجد تعليقات حتى الآن. كن أول من يعلق!</p>';
+      } else {
+        comments.forEach(comment => {
+          html += `
+            <div style="background: white; padding: 15px; margin-bottom: 10px; border-right: 3px solid #9acd32; border-radius: 4px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <strong style="color: #333;">${escapeHtml(comment.name)}</strong>
+                <small style="color: #999;">${comment.date}</small>
+              </div>
+              <p style="color: #555; margin: 0;">${escapeHtml(comment.text)}</p>
+            </div>
+          `;
+        });
+      }
+      
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // تحديث التعليقات عند تحميل الصفحة
+    function initComments() {
+      const path = window.location.pathname;
+      if (path.includes('visitor-pulse')) {
+        setTimeout(renderComments, 500);
       }
     }
 
     // استدعاء الدالة عند تحميل الصفحة
-    loadUtterances();
-    
-    // إضافة مستمع حدث لتشغيل الدالة عند تغيير المسار في SPA
-    window.addEventListener('popstate', loadUtterances);
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initComments);
+    } else {
+      initComments();
+    }
+
+    // إضافة مستمع حدث لتحديث التعليقات عند تغيير المسار
+    window.addEventListener('popstate', initComments);
+
+    // معالجة زر نشر الرأي
+    function setupCommentForm() {
+      const path = window.location.pathname;
+      if (!path.includes('visitor-pulse')) return;
+
+      const nameInput = document.getElementById('name');
+      const commentInput = document.getElementById('comment');
+      const submitBtn = document.querySelector('button:contains("نشر الرأي")') || 
+                        Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.includes('نشر الرأي'));
+
+      if (submitBtn) {
+        submitBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          
+          const name = nameInput ? nameInput.value : '';
+          const text = commentInput ? commentInput.value : '';
+          
+          if (commentsSystem.addComment(name, text)) {
+            // مسح الحقول
+            if (nameInput) nameInput.value = '';
+            if (commentInput) commentInput.value = '';
+            
+            // تحديث التعليقات
+            renderComments();
+            
+            // إظهار رسالة نجاح
+            alert('شكراً! تم نشر تعليقك بنجاح.');
+          } else {
+            alert('الرجاء ملء جميع الحقول.');
+          }
+        });
+      }
+    }
+
+    // تشغيل إعداد النموذج
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', setupCommentForm);
+    } else {
+      setupCommentForm();
+    }
+
+    window.addEventListener('popstate', setupCommentForm);
     // قد تحتاج تطبيقات React إلى طريقة أخرى لاكتشاف تغيير المسار
     // سنعتمد على popstate و window.location.pathname
     
