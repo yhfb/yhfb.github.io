@@ -83,113 +83,83 @@ Error generating stack: `+l.message+`
       defer
       src="%VITE_ANALYTICS_ENDPOINT%/umami"
       data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
-  <script type="module">
-    // Firebase Comments System
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    import { getDatabase, ref, push, onValue, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+  <script>
+    // Simple Comments System using localStorage
+    class CommentsSystem {
+      constructor() {
+        this.storageKey = 'visitor-pulse-comments';
+        this.comments = this.loadFromStorage();
+        this.setupForm();
+        this.renderComments();
+      }
 
-    // Firebase configuration
-    const firebaseConfig = {
-      apiKey: "AIzaSyAK3QILiII5JuPSCmL5MOPm96TAl2Q_ddU",
-      authDomain: "new-gming.firebaseapp.com",
-      projectId: "new-gming",
-      storageBucket: "new-gming.firebasestorage.app",
-      messagingSenderId: "211211791207",
-      appId: "1:211211791207:web:5f9f77908ee4e9a4781dc2",
-      databaseURL: "https://new-gming-default-rtdb.firebaseio.com"
-    };
-
-    try {
-      // Initialize Firebase
-      const app = initializeApp(firebaseConfig);
-      const database = getDatabase(app);
-
-      // Comments System with Firebase
-      class FirebaseCommentsSystem {
-        constructor() {
-          this.commentsRef = ref(database, 'comments');
-          this.comments = [];
-          this.loadComments();
-        }
-
-        loadComments() {
-          try {
-            const q = query(this.commentsRef, orderByChild('timestamp'), limitToLast(50));
-            
-            onValue(q, (snapshot) => {
-              this.comments = [];
-              snapshot.forEach((childSnapshot) => {
-                this.comments.unshift(childSnapshot.val());
-              });
-              this.renderComments();
-            }, (error) => {
-              console.error('Firebase read error:', error);
-            });
-          } catch (error) {
-            console.error('Firebase query error:', error);
-          }
-        }
-
-        addComment(name, text) {
-          if (!name.trim() || !text.trim()) return false;
-
-          const comment = {
-            name: name.trim(),
-            text: text.trim(),
-            timestamp: Date.now(),
-            date: new Date().toLocaleDateString('ar-EG')
-          };
-
-          try {
-            push(this.commentsRef, comment);
-            return true;
-          } catch (error) {
-            console.error('Firebase write error:', error);
-            return false;
-          }
-        }
-
-        renderComments() {
-          const path = window.location.pathname;
-          const container = document.getElementById('comments-container');
-          
-          if (!path.includes('visitor-pulse') || !container) return;
-
-          let html = '<div style="margin-top: 30px; padding: 20px; background: #f9f9f9; border-radius: 8px;">';
-          html += '<h3 style="color: #333; margin-bottom: 20px;">التعليقات (' + this.comments.length + ')</h3>';
-          
-          if (this.comments.length === 0) {
-            html += '<p style="color: #999;">لا توجد تعليقات حتى الآن. كن أول من يعلق!</p>';
-          } else {
-            this.comments.forEach(comment => {
-              html += `
-                <div style="background: white; padding: 15px; margin-bottom: 10px; border-right: 3px solid #9acd32; border-radius: 4px;">
-                  <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                    <strong style="color: #333;">${this.escapeHtml(comment.name)}</strong>
-                    <small style="color: #999;">${comment.date}</small>
-                  </div>
-                  <p style="color: #555; margin: 0;">${this.escapeHtml(comment.text)}</p>
-                </div>
-              `;
-            });
-          }
-          
-          html += '</div>';
-          container.innerHTML = html;
-        }
-
-        escapeHtml(text) {
-          const div = document.createElement('div');
-          div.textContent = text;
-          return div.innerHTML;
+      loadFromStorage() {
+        try {
+          const stored = localStorage.getItem(this.storageKey);
+          return stored ? JSON.parse(stored) : [];
+        } catch (e) {
+          console.error('Error loading comments:', e);
+          return [];
         }
       }
 
-      // Initialize comments system
-      window.commentsSystem = new FirebaseCommentsSystem();
+      saveToStorage() {
+        try {
+          localStorage.setItem(this.storageKey, JSON.stringify(this.comments));
+        } catch (e) {
+          console.error('Error saving comments:', e);
+        }
+      }
 
-      // Setup form handler
-      function setupCommentForm() {
+      addComment(name, text) {
+        if (!name.trim() || !text.trim()) {
+          alert('الرجاء ملء جميع الحقول.');
+          return false;
+        }
+
+        const comment = {
+          name: name.trim(),
+          text: text.trim(),
+          date: new Date().toLocaleDateString('ar-EG'),
+          timestamp: Date.now()
+        };
+
+        this.comments.unshift(comment);
+        this.saveToStorage();
+        this.renderComments();
+        return true;
+      }
+
+      renderComments() {
+        const path = window.location.pathname;
+        const container = document.getElementById('comments-container');
+        
+        if (!path.includes('visitor-pulse') || !container) return;
+
+        let html = '<div style="margin-top: 30px; padding: 20px; background: #f9f9f9; border-radius: 8px;">';
+        html += '<h3 style="color: #333; margin-bottom: 20px;">التعليقات (' + this.comments.length + ')</h3>';
+        
+        if (this.comments.length === 0) {
+          html += '<p style="color: #999;">لا توجد تعليقات حتى الآن. كن أول من يعلق!</p>';
+        } else {
+          this.comments.forEach(comment => {
+            html += `
+              <div style="background: white; padding: 15px; margin-bottom: 10px; border-right: 3px solid #9acd32; border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                  <strong style="color: #333;">${this.escapeHtml(comment.name)}</strong>
+                  <small style="color: #999;">${comment.date}</small>
+                </div>
+                <p style="color: #555; margin: 0;">${this.escapeHtml(comment.text)}</p>
+              </div>
+            `;
+          });
+        }
+        
+        html += '</div>';
+        container.innerHTML = html;
+      }
+
+      setupForm() {
         const path = window.location.pathname;
         if (!path.includes('visitor-pulse')) return;
 
@@ -197,34 +167,36 @@ Error generating stack: `+l.message+`
         const commentInput = document.getElementById('comment');
         const submitBtn = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.includes('نشر الرأي'));
 
-        if (submitBtn && !submitBtn.hasListener) {
-          submitBtn.addEventListener('click', function(e) {
+        if (submitBtn) {
+          submitBtn.addEventListener('click', (e) => {
             e.preventDefault();
             
             const name = nameInput ? nameInput.value : '';
             const text = commentInput ? commentInput.value : '';
             
-            if (window.commentsSystem.addComment(name, text)) {
+            if (this.addComment(name, text)) {
               if (nameInput) nameInput.value = '';
               if (commentInput) commentInput.value = '';
               alert('شكراً! تم نشر تعليقك بنجاح.');
-            } else {
-              alert('الرجاء ملء جميع الحقول.');
             }
           });
-          submitBtn.hasListener = true;
         }
       }
 
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', setupCommentForm);
-      } else {
-        setupCommentForm();
+      escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
       }
+    }
 
-      window.addEventListener('popstate', setupCommentForm);
-    } catch (error) {
-      console.error('Firebase initialization error:', error);
+    // Initialize on page load
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        window.commentsSystem = new CommentsSystem();
+      });
+    } else {
+      window.commentsSystem = new CommentsSystem();
     }
   </script>
   </body>
